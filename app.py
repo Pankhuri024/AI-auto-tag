@@ -50,6 +50,8 @@ def get_keywords_from_ai(text, keyword_list, synonyms=None):
             prompt=prompt,
             max_tokens=150,
         )
+        print("Prompt sent to AI:", prompt)
+        print("AI response:", response.choices[0].text)
         # Extract and return the response as a list
         keywords = response.choices[0].text.strip().split(",")
         return [kw.strip() for kw in keywords if kw.strip()]
