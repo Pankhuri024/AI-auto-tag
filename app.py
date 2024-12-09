@@ -1,12 +1,17 @@
 from flask import Flask, request, jsonify
-import openai
+from langchain.chat_models import ChatOpenAI
+from dotenv import load_dotenv
+import logging
+import os
 
+# Load environment variables
+load_dotenv()
+
+# Initialize Flask app
 app = Flask(__name__)
 
-# Set your OpenAI API key here
-import os
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
+# OpenAI API Key
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Synonym mapping for research types
 RESEARCH_TYPE_SYNONYMS = {
@@ -34,32 +39,34 @@ RESEARCH_TYPE_SYNONYMS = {
     ],
 }
 
+# Initialize OpenAI model
+selected_model = "gpt-3.5-turbo"  # You can switch to 'gpt-4' if needed
+llm = ChatOpenAI(model=selected_model, openai_api_key=OPENAI_API_KEY, temperature=0)
+
+
 def get_keywords_from_ai(text, keyword_list, synonyms=None):
     """
-    Use AI to process and extract keywords from text.
+    Use ChatOpenAI to extract relevant keywords from text.
     """
     prompt = f"""
     You are an intelligent assistant. Given the text: "{text}", and the following keyword list: {keyword_list},
     extract the keywords that are relevant to the text. If synonyms are provided for a keyword, consider them as well.
-    Synonyms: {synonyms if synonyms else "None"}
-    Return the keywords as a list.
+    Synonyms: {synonyms if synonyms else "None"}.
+    Return the keywords as a Python list.
     """
+
     try:
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=150,
-        )
-        print("Prompt sent to AI:", prompt)
-        print("AI response:", response.choices[0].text)
-        # Extract and return the response as a list
-        keywords = response.choices[0].text.strip().split(",")
-        return [kw.strip() for kw in keywords if kw.strip()]
+        response = llm.predict(prompt)
+        logging.debug(f"Raw model response: {response}")
+
+        # Parse response into a list
+        return eval(response) if response.startswith("[") else []
     except Exception as e:
-        print(f"Error calling OpenAI API: {e}")
+        logging.error(f"Error calling OpenAI API: {e}")
         return []
 
-@app.route('/process_insight', methods=['POST'])
+
+@app.route("/process_insight", methods=["POST"])
 def process_insight():
     try:
         data = request.get_json()
@@ -97,7 +104,9 @@ def process_insight():
         )
 
     except Exception as e:
+        logging.error(f"Error processing insight: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)
